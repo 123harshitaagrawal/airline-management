@@ -1,0 +1,18 @@
+# IntelliJ IDEA files
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Maven files
+target/
+
+# Logs
+*.log
+
+# H2 database files
+*.h2.db
+
+# Environment files
+.env
