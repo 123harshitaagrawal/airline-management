@@ -26,4 +26,9 @@ public class FlightController {
     public Flight getFlightById(@PathVariable Long id) {
         return flightService.getFlightById(id);
     }
+
+    @PostMapping
+    public Flight createFlight(@RequestBody Flight flight) {
+        return flightService.createFlight(flight);
+    }
 }
