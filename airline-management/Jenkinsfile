@@ -7,28 +7,37 @@ pipeline {
         AWS_EC2_KEY = credentials('ec2-key')
         JAR_FILE = 'target/airline-management-0.0.1-SNAPSHOT.jar'
         MAVEN_HOME = 'C:\\Users\\harsh\\apache-maven\\apache-maven-3.9.9'
+        WORKSPACE_DIR = 'airline-management'
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+                dir("${WORKSPACE_DIR}") {
+                    // Change to the project directory
+                    bat 'cd /d %WORKSPACE%\\%WORKSPACE_DIR%'
+                }
             }
         }
 
         stage('Build') {
             steps {
-                bat """
-                    "%MAVEN_HOME%\\bin\\mvn" clean package -DskipTests
-                """
+                dir("${WORKSPACE_DIR}") {
+                    bat """
+                        "%MAVEN_HOME%\\bin\\mvn" clean package -DskipTests
+                    """
+                }
             }
         }
 
         stage('Test') {
             steps {
-                bat """
-                    "%MAVEN_HOME%\\bin\\mvn" test
-                """
+                dir("${WORKSPACE_DIR}") {
+                    bat """
+                        "%MAVEN_HOME%\\bin\\mvn" test
+                    """
+                }
             }
             post {
                 always {
@@ -39,20 +48,24 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-key']) {
-                    bat """
-                        scp -o StrictHostKeyChecking=no %JAR_FILE% %AWS_EC2_USER%@%AWS_EC2_HOST%:/home/%AWS_EC2_USER%/app/
-                    """
+                dir("${WORKSPACE_DIR}") {
+                    sshagent(['ec2-key']) {
+                        bat """
+                            scp -o StrictHostKeyChecking=no %JAR_FILE% %AWS_EC2_USER%@%AWS_EC2_HOST%:/home/%AWS_EC2_USER%/app/
+                        """
+                    }
                 }
             }
         }
 
         stage('Start Application') {
             steps {
-                sshagent(['ec2-key']) {
-                    bat """
-                        ssh -o StrictHostKeyChecking=no %AWS_EC2_USER%@%AWS_EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%AWS_EC2_USER%/app/%JAR_FILE% > app.log 2>&1 &"
-                    """
+                dir("${WORKSPACE_DIR}") {
+                    sshagent(['ec2-key']) {
+                        bat """
+                            ssh -o StrictHostKeyChecking=no %AWS_EC2_USER%@%AWS_EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%AWS_EC2_USER%/app/%JAR_FILE% > app.log 2>&1 &"
+                        """
+                    }
                 }
             }
         }
