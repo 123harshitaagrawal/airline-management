@@ -4,39 +4,38 @@ pipeline {
     environment {
         AWS_EC2_IP = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
         AWS_SSH_USER = 'ec2-user'
-        REPO_URL = 'https://github.com/123harshitaagrawal/airline-management.git'
     }
     
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', 
-                         branches: [[name: '*/main']],
-                         userRemoteConfigs: [[url: env.REPO_URL]]])
+                checkout scm
             }
         }
         
         stage('Build with Maven') {
-    agent {
-        docker {
-            image 'maven:3.8.6-eclipse-temurin-17'
-            args '-v $HOME/.m2:/root/.m2'
+            agent {
+                docker {
+                    image 'maven:3.8.6-eclipse-temurin-17'
+                    args '-v /c/Users/jenkins/.m2:/root/.m2'  // Adjusted for Windows
+                    reuseNode true  // Important for Windows
+                }
+            }
+            steps {
+                bat 'mvn clean package'
+            }
         }
-    }
-    steps {
-        sh 'mvn clean package'
-    }
-}
         
         stage('Test') {
             agent {
                 docker {
                     image 'maven:3.8.6-eclipse-temurin-17'
-                    args '-v $HOME/.m2:/root/.m2'
+                    args '-v /c/Users/jenkins/.m2:/root/.m2'
+                    reuseNode true
                 }
             }
             steps {
-                sh 'mvn test'
+                bat 'mvn test'
             }
             post {
                 always {
@@ -49,13 +48,10 @@ pipeline {
             steps {
                 script {
                     sshagent(['ec2-ssh-key']) {
-                        sh """
-                            scp -o StrictHostKeyChecking=no target/*.jar ${AWS_SSH_USER}@${AWS_EC2_IP}:/home/${AWS_SSH_USER}/
-                            ssh -o StrictHostKeyChecking=no ${AWS_SSH_USER}@${AWS_EC2_IP} << EOF
-                                pgrep -f airline-management | xargs kill -9 || true
-                                nohup java -jar /home/${AWS_SSH_USER}/*.jar > /home/${AWS_SSH_USER}/app.log 2>&1 &
-                                exit
-                            EOF
+                        bat """
+                            scp -o StrictHostKeyChecking=no target/*.jar %AWS_SSH_USER%@%AWS_EC2_IP%:/home/%AWS_SSH_USER%/
+                            ssh -o StrictHostKeyChecking=no %AWS_SSH_USER%@%AWS_EC2_IP% "pgrep -f airline-management | xargs kill -9 || true"
+                            ssh -o StrictHostKeyChecking=no %AWS_SSH_USER%@%AWS_EC2_IP% "nohup java -jar /home/%AWS_SSH_USER%/*.jar > /home/%AWS_SSH_USER%/app.log 2>&1 &"
                         """
                     }
                 }
@@ -65,15 +61,9 @@ pipeline {
     
     post {
         failure {
-             echo 'Pipeline failed. Please check: ${BUILD_URL}'
-            // emailext body: 'Pipeline failed. Please check: ${BUILD_URL}',
-            //         subject: 'Pipeline Failed: ${JOB_NAME} - Build #${BUILD_NUMBER}',
-            //         to: 'your-email@example.com',
-            //         replyTo: 'your-email@example.com',
-            //         from: 'jenkins@yourdomain.com'
-        }
-        success {
-            echo 'Pipeline completed successfully!'
+            emailext body: 'Pipeline failed. Please check: ${BUILD_URL}',
+                    subject: 'Pipeline Failed: ${JOB_NAME} - Build #${BUILD_NUMBER}',
+                    to: 'your-email@example.com'
         }
     }
 }
