@@ -17,16 +17,16 @@ pipeline {
         }
         
         stage('Build with Maven') {
-            agent {
-                docker {
-                    image 'maven:3.8.6-jdk-17'
-                    args '-v $HOME/.m2:/root/.m2'
-                }
-            }
-            steps {
-                sh 'mvn clean package'
-            }
+    agent {
+        docker {
+            image 'maven:3.8.6-openjdk-17'
+            args '-v $HOME/.m2:/root/.m2'
         }
+    }
+    steps {
+        sh 'mvn clean package'
+    }
+}
         
         stage('Test') {
             agent {
