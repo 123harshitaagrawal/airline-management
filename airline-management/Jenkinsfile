@@ -1,70 +1,54 @@
 pipeline {
     agent any
+
     environment {
-        DOCKER_IMAGE = 'maven:3.8.4-openjdk-17'
-        AWS_EC2_HOST = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
-        AWS_EC2_USER = 'ec2-user'
-        AWS_EC2_KEY = credentials('ec2-key')
-        JAR_FILE = 'target/airline-management-0.0.1-SNAPSHOT.jar'
+        AWS_EC2_KEY = credentials('ec2-key') // Use your Jenkins credential ID
     }
+
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/123harshitaagrawal/airline-management'
+                git url: 'https://github.com/123harshitaagrawal/airline-management', branch: 'main'
             }
         }
+
         stage('Build') {
             steps {
                 script {
-                    def mavenImage = docker.image('maven:3.8.6-openjdk-17')
-                    mavenImage.inside("-v ${env.USERPROFILE}\\.m2:/root/.m2") {
-                        bat 'mvn clean package -DskipTests'
+                    docker.image('maven:3.8.6-eclipse-temurin-17').inside {
+                        bat 'mvn clean package'
                     }
                 }
             }
         }
+
         stage('Test') {
             steps {
-                script {
-                    def mavenImage = docker.image('maven:3.8.6-openjdk-17')
-                    mavenImage.inside("-v ${env.USERPROFILE}\\.m2:/root/.m2") {
-                        bat 'mvn test'
-                    }
-                }
-            }
-            post {
-                always {
-                    junit '**/target/surefire-reports/*.xml'
-                }
+                echo 'Running tests...'
+                // Add actual test commands here, e.g.:
+                // bat 'mvn test'
             }
         }
+
         stage('Deploy to EC2') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    bat """
-                        scp -o StrictHostKeyChecking=no target/%JAR_NAME% %EC2_USER%@%EC2_HOST%:/home/%EC2_USER%/app/app.jar
-                    """
-                }
+                echo 'Deploying to EC2...'
+                // Add your SCP/SSH deploy commands here
             }
         }
+
         stage('Start Application') {
             steps {
-                sshagent(['ec2-ssh-key']) {
-                    bat """
-                        ssh -o StrictHostKeyChecking=no %EC2_USER%@%EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%EC2_USER%/app/app.jar &"
-                    """
-                }
+                echo 'Starting application on EC2...'
+                // Add SSH commands to start your app, e.g. via systemctl or nohup
             }
         }
     }
+
     post {
         always {
-            node('') {
-                cleanWs()
-            }
-        }
-        success {
-            echo 'Pipeline completed successfully!'
+            cleanWs()
+            echo 'Pipeline completed.'
         }
         failure {
             echo 'Pipeline failed. Check logs for details.'
