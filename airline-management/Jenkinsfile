@@ -2,13 +2,17 @@ pipeline {
     agent any
 
     environment {
-        AWS_EC2_KEY = credentials('ec2-key') // Use your Jenkins credential ID
+        DOCKER_IMAGE = 'maven:3.8.6-eclipse-temurin-17'
+        AWS_EC2_HOST = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
+        AWS_EC2_USER = 'ec2-user'
+        AWS_EC2_KEY = credentials('ec2-key')
+        JAR_FILE = 'target/airline-management-0.0.1-SNAPSHOT.jar'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/123harshitaagrawal/airline-management', branch: 'main'
+                checkout scm
             }
         }
 
@@ -16,7 +20,7 @@ pipeline {
             steps {
                 script {
                     docker.image('maven:3.8.6-eclipse-temurin-17').inside {
-                        bat 'mvn clean package'
+                        sh 'mvn clean package -DskipTests'
                     }
                 }
             }
@@ -24,23 +28,48 @@ pipeline {
 
         stage('Test') {
             steps {
-                echo 'Running tests...'
-                // Add actual test commands here, e.g.:
-                // bat 'mvn test'
+                script {
+                    docker.image('maven:3.8.6-eclipse-temurin-17').inside {
+                        sh 'mvn test'
+                    }
+                }
+            }
+            post {
+                always {
+                    junit '**/target/surefire-reports/*.xml'
+                }
             }
         }
 
         stage('Deploy to EC2') {
             steps {
-                echo 'Deploying to EC2...'
-                // Add your SCP/SSH deploy commands here
+                sshagent(['ec2-key']) {
+                    sh """
+                        scp -o StrictHostKeyChecking=no ${JAR_FILE} ${AWS_EC2_USER}@${AWS_EC2_HOST}:/home/${AWS_EC2_USER}/app/
+                    """
+                }
             }
         }
 
         stage('Start Application') {
             steps {
-                echo 'Starting application on EC2...'
-                // Add SSH commands to start your app, e.g. via systemctl or nohup
+                sshagent(['ec2-key']) {
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${AWS_EC2_USER}@${AWS_EC2_HOST} '
+                            # Kill any existing process using port 8080
+                            fuser -k 8080/tcp || true
+                            
+                            # Start the application
+                            nohup java -jar /home/${AWS_EC2_USER}/app/${JAR_FILE} > app.log 2>&1 &
+                            
+                            # Wait for application to start
+                            sleep 30
+                            
+                            # Check if application is running
+                            curl -f http://localhost:8080/actuator/health || exit 1
+                        '
+                    """
+                }
             }
         }
     }
@@ -48,10 +77,12 @@ pipeline {
     post {
         always {
             cleanWs()
-            echo 'Pipeline completed.'
+        }
+        success {
+            echo 'Pipeline completed successfully!'
         }
         failure {
-            echo 'Pipeline failed. Check logs for details.'
+            echo 'Pipeline failed!'
         }
     }
 }
