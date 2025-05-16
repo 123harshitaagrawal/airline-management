@@ -19,7 +19,7 @@ pipeline {
         stage('Build with Maven') {
             agent {
                 docker {
-                    image 'maven:3.8.6-openjdk-17'
+                    image 'maven:3.8.6-jdk-17'
                     args '-v $HOME/.m2:/root/.m2'
                 }
             }
@@ -29,6 +29,12 @@ pipeline {
         }
         
         stage('Test') {
+            agent {
+                docker {
+                    image 'maven:3.8.6-jdk-17'
+                    args '-v $HOME/.m2:/root/.m2'
+                }
+            }
             steps {
                 sh 'mvn test'
             }
@@ -42,7 +48,6 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 script {
-                    // Copy JAR to EC2
                     sshagent(['ec2-ssh-key']) {
                         sh """
                             scp -o StrictHostKeyChecking=no target/*.jar ${AWS_SSH_USER}@${AWS_EC2_IP}:/home/${AWS_SSH_USER}/
@@ -60,9 +65,12 @@ pipeline {
     
     post {
         failure {
-            emailext body: 'Pipeline failed. Please check: ${BUILD_URL}',
-                    subject: 'Pipeline Failed: ${JOB_NAME} - Build #${BUILD_NUMBER}',
-                    to: 'your-email@example.com'
+             echo 'Pipeline failed. Please check: ${BUILD_URL}'
+            // emailext body: 'Pipeline failed. Please check: ${BUILD_URL}',
+            //         subject: 'Pipeline Failed: ${JOB_NAME} - Build #${BUILD_NUMBER}',
+            //         to: 'your-email@example.com',
+            //         replyTo: 'your-email@example.com',
+            //         from: 'jenkins@yourdomain.com'
         }
         success {
             echo 'Pipeline completed successfully!'
