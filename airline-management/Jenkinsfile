@@ -1,42 +1,30 @@
 pipeline {
     agent any
-
     environment {
-        AWS_EC2_HOST = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
-        AWS_EC2_USER = 'ec2-user'
-        AWS_EC2_KEY = credentials('ec2-key')
-        JAR_FILE = 'target/airline-management-0.0.1-SNAPSHOT.jar'
+        AWS_REGION = 'us-east-2'
+        EC2_HOST = '3.15.235.93'
+        EC2_USER = 'ec2-user'
+        SSH_KEY = credentials('ec2-ssh-key')
+        JAR_NAME = 'airline-management-0.0.1-SNAPSHOT.jar'
         MAVEN_HOME = 'C:\\Users\\harsh\\apache-maven\\apache-maven-3.9.9'
-        WORKSPACE_DIR = 'airline-management'
     }
-
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
-                dir("${WORKSPACE_DIR}") {
-                    // Change to the project directory
-                    bat 'cd /d %WORKSPACE%\\%WORKSPACE_DIR%'
-                }
+                git branch: 'main', url: 'https://github.com/123harshitaagrawal/airline-management'
             }
         }
-
         stage('Build') {
             steps {
-                dir("${WORKSPACE_DIR}") {
-                    bat """
-                        "%MAVEN_HOME%\\bin\\mvn" clean package -DskipTests
-                    """
+                dir('airline-management') {
+                    bat "\"${MAVEN_HOME}\\bin\\mvn\" clean package -DskipTests"
                 }
             }
         }
-
         stage('Test') {
             steps {
-                dir("${WORKSPACE_DIR}") {
-                    bat """
-                        "%MAVEN_HOME%\\bin\\mvn" test
-                    """
+                dir('airline-management') {
+                    bat "\"${MAVEN_HOME}\\bin\\mvn\" test"
                 }
             }
             post {
@@ -45,39 +33,36 @@ pipeline {
                 }
             }
         }
-
         stage('Deploy to EC2') {
             steps {
-                dir("${WORKSPACE_DIR}") {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                    dir('airline-management') {
                         bat """
-                            icacls "%SSH_KEY%" /inheritance:r /grant:r %USERNAME%:R
-                            set PATH=%PATH%;C:\\Windows\\System32\\OpenSSH
-                            scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no "%JAR_FILE%" %AWS_EC2_USER%@%AWS_EC2_HOST%:/home/%AWS_EC2_USER%/app/
+                            icacls "%SSH_KEY%" /inheritance:r /grant:r "%USERNAME%:R"
+                            scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no target/%JAR_NAME% %EC2_USER%@%EC2_HOST%:/home/%EC2_USER%/app/app.jar
                         """
                     }
                 }
             }
         }
-
         stage('Start Application') {
             steps {
-                dir("${WORKSPACE_DIR}") {
-                    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')]) {
+                withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+                    dir('airline-management') {
                         bat """
-                            icacls "%SSH_KEY%" /inheritance:r /grant:r %USERNAME%:R
-                            set PATH=%PATH%;C:\\Windows\\System32\\OpenSSH
-                            ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %AWS_EC2_USER%@%AWS_EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%AWS_EC2_USER%/app/%JAR_FILE% > app.log 2>&1 &"
+                            icacls "%SSH_KEY%" /inheritance:r /grant:r "%USERNAME%:R"
+                            ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %EC2_USER%@%EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%EC2_USER%/app/app.jar &"
                         """
                     }
                 }
             }
         }
     }
-
     post {
         always {
-            cleanWs()
+            node('') {
+                cleanWs()
+            }
         }
         success {
             echo 'Pipeline completed successfully!'
