@@ -20,4 +20,7 @@ public class FlightService {
     public Flight getFlightById(Long id) {
         return flightRepository.findById(id).orElse(null);
     }
+    public Flight createFlight(Flight flight) {
+        return flightRepository.save(flight);
+    }
 }
