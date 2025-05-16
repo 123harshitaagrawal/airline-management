@@ -1,12 +1,13 @@
 pipeline {
     agent any
     environment {
-        AWS_REGION = 'us-east-2'
+        AWS_REGION = 'us-east-2' // Updated to US East 2 (Ohio)
         EC2_HOST = '3.15.235.93'
         EC2_USER = 'ec2-user'
         SSH_KEY = credentials('ec2-ssh-key')
         JAR_NAME = 'airline-management-0.0.1-SNAPSHOT.jar'
     }
+osso
     stages {
         stage('Checkout') {
             steps {
@@ -42,7 +43,7 @@ pipeline {
             steps {
                 sshagent(['ec2-ssh-key']) {
                     bat """
-                        scp -o StrictHostKeyChecking=no target/${env.JAR_NAME} ${env.EC2_USER}@${env.EC2_HOST}:/home/${env.EC2_USER}/app/app.jar
+                        scp -o StrictHostKeyChecking=no target/%JAR_NAME% %EC2_USER%@%EC2_HOST%:/home/%EC2_USER%/app/app.jar
                     """
                 }
             }
@@ -51,7 +52,7 @@ pipeline {
             steps {
                 sshagent(['ec2-ssh-key']) {
                     bat """
-                        ssh -o StrictHostKeyChecking=no ${env.EC2_USER}@${env.EC2_HOST} "pkill -f \\"java -jar\\" || true && nohup java -jar /home/${env.EC2_USER}/app/app.jar &"
+                        ssh -o StrictHostKeyChecking=no %EC2_USER%@%EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%EC2_USER%/app/app.jar &"
                     """
                 }
             }
@@ -59,7 +60,9 @@ pipeline {
     }
     post {
         always {
-            cleanWs()
+            node('') {
+                cleanWs()
+            }
         }
         success {
             echo 'Pipeline completed successfully!'
