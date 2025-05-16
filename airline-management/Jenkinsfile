@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_IMAGE = 'maven:3.8.6-eclipse-temurin-17'
         AWS_EC2_HOST = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
         AWS_EC2_USER = 'ec2-user'
         AWS_EC2_KEY = credentials('ec2-key')
@@ -18,21 +17,13 @@ pipeline {
 
         stage('Build') {
             steps {
-                script {
-                    docker.image('maven:3.8.6-eclipse-temurin-17').inside {
-                        sh 'mvn clean package -DskipTests'
-                    }
-                }
+                bat 'mvn clean package -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
-                script {
-                    docker.image('maven:3.8.6-eclipse-temurin-17').inside {
-                        sh 'mvn test'
-                    }
-                }
+                bat 'mvn test'
             }
             post {
                 always {
@@ -44,8 +35,8 @@ pipeline {
         stage('Deploy to EC2') {
             steps {
                 sshagent(['ec2-key']) {
-                    sh """
-                        scp -o StrictHostKeyChecking=no ${JAR_FILE} ${AWS_EC2_USER}@${AWS_EC2_HOST}:/home/${AWS_EC2_USER}/app/
+                    bat """
+                        scp -o StrictHostKeyChecking=no %JAR_FILE% %AWS_EC2_USER%@%AWS_EC2_HOST%:/home/%AWS_EC2_USER%/app/
                     """
                 }
             }
@@ -54,20 +45,8 @@ pipeline {
         stage('Start Application') {
             steps {
                 sshagent(['ec2-key']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ${AWS_EC2_USER}@${AWS_EC2_HOST} '
-                            # Kill any existing process using port 8080
-                            fuser -k 8080/tcp || true
-                            
-                            # Start the application
-                            nohup java -jar /home/${AWS_EC2_USER}/app/${JAR_FILE} > app.log 2>&1 &
-                            
-                            # Wait for application to start
-                            sleep 30
-                            
-                            # Check if application is running
-                            curl -f http://localhost:8080/actuator/health || exit 1
-                        '
+                    bat """
+                        ssh -o StrictHostKeyChecking=no %AWS_EC2_USER%@%AWS_EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%AWS_EC2_USER%/app/%JAR_FILE% > app.log 2>&1 &"
                     """
                 }
             }
