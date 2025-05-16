@@ -51,7 +51,7 @@ pipeline {
                 dir("${WORKSPACE_DIR}") {
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')]) {
                         bat """
-                            icacls "%SSH_KEY%" /inheritance:r /remove:g BUILTIN\\Users
+                            icacls "%SSH_KEY%" /inheritance:r /remove:g BUILTIN\\Users /grant:r SYSTEM:R
                             set PATH=%PATH%;C:\\Windows\\System32\\OpenSSH
                             scp -i "%SSH_KEY%" -o StrictHostKeyChecking=no "%JAR_FILE%" %AWS_EC2_USER%@%AWS_EC2_HOST%:/home/%AWS_EC2_USER%/app/
                         """
@@ -65,7 +65,7 @@ pipeline {
                 dir("${WORKSPACE_DIR}") {
                     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-key', keyFileVariable: 'SSH_KEY')]) {
                         bat """
-                            icacls "%SSH_KEY%" /inheritance:r /remove:g BUILTIN\\Users
+                            icacls "%SSH_KEY%" /inheritance:r /remove:g BUILTIN\\Users /grant:r SYSTEM:R
                             set PATH=%PATH%;C:\\Windows\\System32\\OpenSSH
                             ssh -i "%SSH_KEY%" -o StrictHostKeyChecking=no %AWS_EC2_USER%@%AWS_EC2_HOST% "pkill -f \\"java -jar\\" || true && nohup java -jar /home/%AWS_EC2_USER%/app/%JAR_FILE% > app.log 2>&1 &"
                         """
