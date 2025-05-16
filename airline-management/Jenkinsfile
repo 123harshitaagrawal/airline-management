@@ -1,13 +1,12 @@
 pipeline {
     agent any
     environment {
-        AWS_REGION = 'us-east-2' // Updated to US East 2 (Ohio)
+        AWS_REGION = 'us-east-2'
         EC2_HOST = '3.15.235.93'
         EC2_USER = 'ec2-user'
         SSH_KEY = credentials('ec2-ssh-key')
         JAR_NAME = 'airline-management-0.0.1-SNAPSHOT.jar'
     }
-osso
     stages {
         stage('Checkout') {
             steps {
