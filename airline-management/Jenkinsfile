@@ -1,5 +1,10 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'maven:3.9.6-eclipse-temurin-17'
+            args '-v /root/.m2:/root/.m2'
+        }
+    }
 
     environment {
         AWS_EC2_HOST = 'ec2-3-15-235-93.us-east-2.compute.amazonaws.com'
